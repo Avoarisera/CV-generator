@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>BODS · Générateur de CV (norme européenne)</title>
+<title>BODS · Générateur de CV </title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -39,7 +39,7 @@
 
   .layout{display:grid;grid-template-columns:minmax(400px,480px) 1fr;height:calc(100vh - 104px)}
   .form-pane{overflow-y:auto;padding:18px 22px 90px}
-  .preview-pane{overflow-y:auto;padding:28px;background:#05050c;display:flex;justify-content:center}
+  .preview-pane{overflow-y:auto;padding:28px;background:#05050c;display:flex;justify-content:center;align-items:flex-start}
 
   .form-tools{display:flex;align-items:center;gap:10px;margin-bottom:16px}
   .saved{margin-left:auto;font-size:12px;color:var(--green);opacity:0;transition:opacity .3s}
@@ -95,7 +95,7 @@
   .chk input{width:auto}
 
   /* ============ CV PAPER (inchangé) ============ */
-  .cv-paper{width:210mm;min-height:297mm;background:var(--paper);color:var(--ink);box-shadow:0 14px 50px rgba(0,0,0,.55);flex:none;position:relative;display:flex;flex-direction:column;font-size:10.5pt;line-height:1.5;overflow:hidden}
+  .cv-paper{width:210mm;min-height:297mm;align-self:flex-start;background:var(--paper);color:var(--ink);box-shadow:0 14px 50px rgba(0,0,0,.55);flex:none;position:relative;display:flex;flex-direction:column;font-size:10.5pt;line-height:1.5;overflow:hidden}
   .cv-topbar,.cv-botbar{height:7px;background:linear-gradient(90deg,var(--teal),var(--blue));flex:none}
   .cv-wm{position:absolute;right:-30mm;top:90mm;width:120mm;height:120mm;border-radius:50%;background:radial-gradient(circle,rgba(23,154,167,.06),transparent 70%);pointer-events:none}
   .cv-inner{padding:16mm 16mm 8mm;flex:1;position:relative;z-index:1}
@@ -426,14 +426,26 @@ function renderCV(){
 /* ---------------- PDF (inchangé) ---------------- */
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 async function makePDF(forceMode){
-  const prev=mode; if(forceMode){setMode(forceMode);await delay(160);}
+  const prev=mode; if(forceMode){setMode(forceMode);await delay(180);}
   const node=document.getElementById('cvPaper');
   const canvas=await html2canvas(node,{scale:2,backgroundColor:'#ffffff',useCORS:true});
-  const img=canvas.toDataURL('image/jpeg',0.95);
   const {jsPDF}=window.jspdf; const pdf=new jsPDF('p','mm','a4');
-  const w=210,h=canvas.height*w/canvas.width; let pos=0,left=h;
-  pdf.addImage(img,'JPEG',0,pos,w,h); left-=297;
-  while(left>0){pos=left-h;pdf.addPage();pdf.addImage(img,'JPEG',0,pos,w,h);left-=297;}
+  const pageW=210, pageH=297;
+  const pxPerMm=canvas.width/pageW;
+  const pageHpx=Math.floor(pageH*pxPerMm);
+  let y=0, page=0;
+  while(y<canvas.height){
+    const sliceH=Math.min(pageHpx, canvas.height-y);
+    const pc=document.createElement('canvas');
+    pc.width=canvas.width; pc.height=sliceH;
+    const ctx=pc.getContext('2d');
+    ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,pc.width,pc.height);
+    ctx.drawImage(canvas,0,y,canvas.width,sliceH,0,0,canvas.width,sliceH);
+    const imgData=pc.toDataURL('image/jpeg',0.95);
+    if(page>0) pdf.addPage();
+    pdf.addImage(imgData,'JPEG',0,0,pageW,sliceH/pxPerMm);
+    y+=sliceH; page++;
+  }
   const fname=(mode==='client'?'CV_'+autoRef()+'_client':'CV_'+((data.nom||data.titre||'consultant').replace(/\s+/g,'_'))+'_interne')+'.pdf';
   pdf.save(fname); if(forceMode&&forceMode!==prev)setMode(prev);
 }
